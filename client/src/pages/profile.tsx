@@ -1,19 +1,32 @@
 import { useState, useEffect } from "react";
+import {
+  Platform,
+  Alert,
+  Image,
+  TouchableOpacity
+} from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertConsultantSchema, type InsertConsultant, type Consultant } from "@shared/schema";
+import {
+  insertConsultantSchema,
+  type InsertConsultant,
+  type Consultant,
+} from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Camera, Save } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const [touchTimer, setTouchTimer] = useState<NodeJS.Timeout | null>(null);
   const [wrongAttempts, setWrongAttempts] = useState(0);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -36,7 +49,15 @@ export default function Profile() {
         phone: consultant.phone || "",
       });
     }
-  }, [consultant, form]);
+    loadProfileImage();
+  }, [consultant]);
+
+  const loadProfileImage = async () => {
+    if (Platform.OS === "android") {
+      const savedImage = await AsyncStorage.getItem("profile_image");
+      if (savedImage) setProfileImage(savedImage);
+    }
+  };
 
   const updateMutation = useMutation({
     mutationFn: async (data: InsertConsultant) => {
@@ -65,8 +86,9 @@ export default function Profile() {
   };
 
   const handleSecretUnlock = () => {
-    const code = prompt("Enter the secret code to unlock editing:");
+    if (Platform.OS !== "android") return;
 
+    const code = prompt("Enter the secret code to unlock editing:");
     if (code === "6111949") {
       setIsEditing(true);
       setWrongAttempts(0);
@@ -95,18 +117,25 @@ export default function Profile() {
     }
   };
 
+  const pickImage = async () => {
+    if (Platform.OS !== "android" || !isEditing) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+      setProfileImage(uri);
+      await AsyncStorage.setItem("profile_image", uri);
+    }
+  };
+
   if (isLoading) {
-    return (
-      <div className="px-6 py-6">
-        <div className="max-w-md mx-auto">
-          <div className="text-center mb-8">
-            <div className="w-24 h-24 bg-gray-200 rounded-full mx-auto mb-4 animate-pulse"></div>
-            <div className="h-6 bg-gray-200 rounded mx-auto mb-2 w-48 animate-pulse"></div>
-            <div className="h-4 bg-gray-200 rounded mx-auto w-32 animate-pulse"></div>
-          </div>
-        </div>
-      </div>
-    );
+    return <div className="text-center py-6">Loading...</div>;
   }
 
   return (
@@ -116,47 +145,64 @@ export default function Profile() {
           <div
             className="relative inline-block mb-4"
             onMouseDown={() => {
-              const timer = setTimeout(() => handleSecretUnlock(), 5000);
-              setTouchTimer(timer);
+              if (Platform.OS === "android") {
+                const timer = setTimeout(() => handleSecretUnlock(), 5000);
+                setTouchTimer(timer);
+              }
             }}
             onMouseUp={() => {
               if (touchTimer) clearTimeout(touchTimer);
             }}
             onTouchStart={() => {
-              const timer = setTimeout(() => handleSecretUnlock(), 5000);
-              setTouchTimer(timer);
+              if (Platform.OS === "android") {
+                const timer = setTimeout(() => handleSecretUnlock(), 5000);
+                setTouchTimer(timer);
+              }
             }}
             onTouchEnd={() => {
               if (touchTimer) clearTimeout(touchTimer);
             }}
           >
-            <img 
-              src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=400" 
-              alt="Rithanya Gopinathan - Wellness Consultant" 
+            <img
+              src={
+                profileImage ||
+                "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=400"
+              }
+              alt="Rithanya Gopinathan - Wellness Consultant"
               className="w-24 h-24 rounded-full object-cover border-4 border-[var(--wellness-green)] shadow-lg"
             />
-            {isEditing && (
-              <button className="absolute bottom-0 right-0 w-8 h-8 bg-wellness-orange rounded-full flex items-center justify-center shadow-md hover:bg-wellness-orange/80 transition-all">
+            {isEditing && Platform.OS === "android" && (
+              <button
+                onClick={pickImage}
+                className="absolute bottom-0 right-0 w-8 h-8 bg-wellness-orange rounded-full flex items-center justify-center shadow-md hover:bg-wellness-orange/80 transition-all"
+              >
                 <Camera className="text-white h-4 w-4" />
               </button>
             )}
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-1">Rithanya Gopinathan</h2>
           <p className="text-gray-600">Wellness Consultant</p>
-          <p className="text-xs text-gray-400 mt-1 italic">(Long press photo to unlock editing)</p>
+          <p className="text-xs text-gray-400 mt-1 italic">
+            (Long press photo to unlock editing)
+          </p>
         </div>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6"
+        >
           <div>
             <Label className="block text-sm font-medium text-gray-700 mb-2">Email Address</Label>
             <Input
               {...form.register("email")}
               type="email"
-              disabled={!isEditing}
+              disabled={!isEditing || Platform.OS !== "android"}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--wellness-green)] focus:border-transparent transition-all"
             />
             {form.formState.errors.email && (
-              <p className="text-red-500 text-sm mt-1">{form.formState.errors.email.message}</p>
+              <p className="text-red-500 text-sm mt-1">
+                {form.formState.errors.email.message}
+              </p>
             )}
           </div>
 
@@ -165,16 +211,18 @@ export default function Profile() {
             <Input
               {...form.register("phone")}
               type="tel"
-              disabled={!isEditing}
+              disabled={!isEditing || Platform.OS !== "android"}
               placeholder="Enter phone number"
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--wellness-green)] focus:border-transparent transition-all"
             />
             {form.formState.errors.phone && (
-              <p className="text-red-500 text-sm mt-1">{form.formState.errors.phone.message}</p>
+              <p className="text-red-500 text-sm mt-1">
+                {form.formState.errors.phone.message}
+              </p>
             )}
           </div>
 
-          {isEditing && (
+          {isEditing && Platform.OS === "android" && (
             <div className="flex space-x-3">
               <Button
                 type="submit"
