@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Save, Edit } from "lucide-react";
+import { Camera, Save } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
+  const [touchTimer, setTouchTimer] = useState<NodeJS.Timeout | null>(null);
+  const [wrongAttempts, setWrongAttempts] = useState(0);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -27,7 +29,6 @@ export default function Profile() {
     },
   });
 
-  // Update form when consultant data loads
   useEffect(() => {
     if (consultant) {
       form.reset({
@@ -63,6 +64,37 @@ export default function Profile() {
     updateMutation.mutate(data);
   };
 
+  const handleSecretUnlock = () => {
+    const code = prompt("Enter the secret code to unlock editing:");
+
+    if (code === "6111949") {
+      setIsEditing(true);
+      setWrongAttempts(0);
+      toast({
+        title: "Access Granted",
+        description: "You can now edit your profile.",
+      });
+    } else {
+      const newAttempts = wrongAttempts + 1;
+      setWrongAttempts(newAttempts);
+
+      if (newAttempts >= 3) {
+        toast({
+          title: "Too Many Attempts",
+          description: "Please press and hold the profile picture again to retry.",
+          variant: "destructive",
+        });
+        setWrongAttempts(0);
+      } else {
+        toast({
+          title: "Incorrect Code",
+          description: `Incorrect code. Attempt ${newAttempts} of 3.`,
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="px-6 py-6">
@@ -81,40 +113,48 @@ export default function Profile() {
     <div className="px-6 py-6">
       <div className="max-w-md mx-auto">
         <div className="text-center mb-8">
-          <div className="relative inline-block mb-4">
+          <div
+            className="relative inline-block mb-4"
+            onMouseDown={() => {
+              const timer = setTimeout(() => handleSecretUnlock(), 5000);
+              setTouchTimer(timer);
+            }}
+            onMouseUp={() => {
+              if (touchTimer) clearTimeout(touchTimer);
+            }}
+            onTouchStart={() => {
+              const timer = setTimeout(() => handleSecretUnlock(), 5000);
+              setTouchTimer(timer);
+            }}
+            onTouchEnd={() => {
+              if (touchTimer) clearTimeout(touchTimer);
+            }}
+          >
             <img 
               src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=400" 
               alt="Rithanya Gopinathan - Wellness Consultant" 
               className="w-24 h-24 rounded-full object-cover border-4 border-[var(--wellness-green)] shadow-lg"
             />
-            <button className="absolute bottom-0 right-0 w-8 h-8 bg-wellness-orange rounded-full flex items-center justify-center shadow-md hover:bg-wellness-orange/80 transition-all">
-              <Camera className="text-white h-4 w-4" />
-            </button>
+            {isEditing && (
+              <button className="absolute bottom-0 right-0 w-8 h-8 bg-wellness-orange rounded-full flex items-center justify-center shadow-md hover:bg-wellness-orange/80 transition-all">
+                <Camera className="text-white h-4 w-4" />
+              </button>
+            )}
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-1">Rithanya Gopinathan</h2>
           <p className="text-gray-600">Wellness Consultant</p>
+          <p className="text-xs text-gray-400 mt-1 italic">(Long press photo to unlock editing)</p>
         </div>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
           <div>
             <Label className="block text-sm font-medium text-gray-700 mb-2">Email Address</Label>
-            <div className="relative">
-              <Input
-                {...form.register("email")}
-                type="email"
-                disabled={!isEditing}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--wellness-green)] focus:border-transparent transition-all pr-10"
-              />
-              {!isEditing && (
-                <button 
-                  type="button"
-                  onClick={() => setIsEditing(true)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-[var(--wellness-green)] transition-all"
-                >
-                  <Edit className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+            <Input
+              {...form.register("email")}
+              type="email"
+              disabled={!isEditing}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--wellness-green)] focus:border-transparent transition-all"
+            />
             {form.formState.errors.email && (
               <p className="text-red-500 text-sm mt-1">{form.formState.errors.email.message}</p>
             )}
@@ -122,24 +162,13 @@ export default function Profile() {
 
           <div>
             <Label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</Label>
-            <div className="relative">
-              <Input
-                {...form.register("phone")}
-                type="tel"
-                disabled={!isEditing}
-                placeholder="Enter phone number"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--wellness-green)] focus:border-transparent transition-all pr-10"
-              />
-              {!isEditing && (
-                <button 
-                  type="button"
-                  onClick={() => setIsEditing(true)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-[var(--wellness-green)] transition-all"
-                >
-                  <Edit className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+            <Input
+              {...form.register("phone")}
+              type="tel"
+              disabled={!isEditing}
+              placeholder="Enter phone number"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--wellness-green)] focus:border-transparent transition-all"
+            />
             {form.formState.errors.phone && (
               <p className="text-red-500 text-sm mt-1">{form.formState.errors.phone.message}</p>
             )}
