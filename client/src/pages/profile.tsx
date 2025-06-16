@@ -178,25 +178,6 @@ export default function Profile() {
             </div>
           )}
         </form>
-
-        {/* Consultant Info */}
-        <div className="mt-8 bg-gradient-to-r from-[var(--wellness-orange-light)] to-orange-100 rounded-2xl p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">Consultant Dashboard</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Active Consultations</span>
-              <span className="font-semibold text-gray-800">12</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">This Month's Bookings</span>
-              <span className="font-semibold text-gray-800">8</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Client Satisfaction</span>
-              <span className="font-semibold text-[var(--wellness-green)]">98%</span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
